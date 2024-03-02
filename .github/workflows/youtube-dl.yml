@@ -1,0 +1,53 @@
+name: youtube-dl
+# 当新建或者修改 issues 时，触发当前 workflow
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  youtube-dl:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'youtube-dl') # issues 的 label 包含 youtube-dl 时候运行
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+      # 2. 下载
+      - name: Downlaod
+        run: |
+          git config --local user.email "zz373045134@gmail.com"
+          git config --local user.name "仔仔"
+          git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git pull --rebase
+          ./bin/youtube-dl --playlist-items '${{ github.event.issue.body }}' -o downloads/%(title)s_%(id)s.%(ext)s -c
+          git add .
+          git commit -m "download youtube video"
+          git push
+      # 3. 为 issues 添加评论
+      - name: Add comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./output.js')
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: await script({github, context, core})
+            })
+      # 4. 为 issues 添加 success 标签
+      - name: Success issues
+        if: ${{ success() }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['success']
+            })
+      
